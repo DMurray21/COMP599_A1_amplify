@@ -1,0 +1,7 @@
+type Image @model {
+  id: ID!
+  user: String!
+  title: String!
+}
+
+
