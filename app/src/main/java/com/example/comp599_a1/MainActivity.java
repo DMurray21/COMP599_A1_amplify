@@ -1,54 +1,75 @@
 package com.example.comp599_a1;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.amplifyframework.AmplifyException;
-import com.amplifyframework.api.aws.AWSApiPlugin;
 import com.amplifyframework.auth.AuthException;
-import com.amplifyframework.auth.AuthUserAttributeKey;
 import com.amplifyframework.auth.cognito.AWSCognitoAuthPlugin;
-import com.amplifyframework.auth.options.AuthSignUpOptions;
 import com.amplifyframework.auth.result.AuthSignInResult;
 import com.amplifyframework.core.Amplify;
 import com.amplifyframework.core.Consumer;
-import com.amplifyframework.datastore.AWSDataStorePlugin;
-import com.amplifyframework.datastore.generated.model.Image;
 import com.amplifyframework.storage.StorageAccessLevel;
 import com.amplifyframework.storage.options.StorageUploadFileOptions;
 import com.amplifyframework.storage.s3.AWSS3StoragePlugin;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    // Login/Register
     private CheckBox isFirstTimeUser;
     private EditText usernameInput;
     private EditText passwordInput;
     private EditText emailInput;
     private Button loginBtn;
 
+    @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login); //initialize view
 
-        //initialize views
+        //initialize views for login
         isFirstTimeUser = findViewById(R.id.isFirstTimeUser);
         usernameInput = findViewById(R.id.usernameInput);
         passwordInput = findViewById(R.id.passwordInput);
         emailInput = findViewById(R.id.emailInput);
         loginBtn = findViewById(R.id.loginBtn);
+
 
         try {
             Amplify.addPlugin(new AWSCognitoAuthPlugin()); //initialize plugins
@@ -78,13 +99,13 @@ public class MainActivity extends AppCompatActivity {
                 String username = usernameInput.getText().toString(); //get user input values
                 String password = passwordInput.getText().toString();
                 String email = emailInput.getText().toString();
-                authenticate(username, password, email);
+                authenticate(username, password, email, v);
             }
         });
     }
 
     //authenticate user with amplify
-    private void authenticate(String username, String password, String email) {
+    private void authenticate(String username, String password, String email, View v) {
         if (username.isEmpty() || password.isEmpty()) {
             runOnUiThread(() -> Toast.makeText(getApplicationContext(), "Please provide credentials in order to login", Toast.LENGTH_LONG).show());
         } else {
@@ -95,8 +116,8 @@ public class MainActivity extends AppCompatActivity {
                         case DONE: //successful login for returning user
                             runOnUiThread(() -> {
                                 Toast.makeText(getApplicationContext(), "Welcome back, " + username, Toast.LENGTH_LONG).show();
-                                onLoginSuccess();
-                                uploadFile(); //TODO remove this call once function is moved
+                                onLoginSuccess(v);
+                                //uploadFile(); //TODO remove this call once function is moved
                             });
                             break;
                         case CONFIRM_SIGN_IN_WITH_NEW_PASSWORD: //successful login for new user
@@ -110,8 +131,8 @@ public class MainActivity extends AppCompatActivity {
                                             case DONE: //successful confirmation of email
                                                 runOnUiThread(() -> {
                                                     Toast.makeText(getApplicationContext(), "Welcome, " + username, Toast.LENGTH_LONG).show();
-                                                    onLoginSuccess();
-                                                    uploadFile(); //TODO remove this call once function is moved
+                                                    onLoginSuccess(v);
+                                                    //uploadFile(); //TODO remove this call once function is moved
                                                 });
                                                 break;
                                             default:
@@ -139,34 +160,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void onLoginSuccess() {
-        //TODO implement redirect to application main page
+    private void onLoginSuccess(View v) {
+        Intent intent = new Intent(v.getContext(), ImageProcessor.class);
+        startActivity(intent);
     }
 
-    //TODO move to new page
-    private void uploadFile() {
-        File exampleFile = new File(getApplicationContext().getFilesDir(), "ExampleKey");
-
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(exampleFile));
-            writer.append("Example file contents");
-            writer.close();
-        } catch (Exception exception) {
-            Log.e("MyAmplifyApp", "Upload failed", exception);
-        }
-
-
-        StorageUploadFileOptions options =
-                StorageUploadFileOptions.builder()
-                        .accessLevel(StorageAccessLevel.PRIVATE)
-                        .build();
-
-        Amplify.Storage.uploadFile(
-                "khalilv_first_file",
-                exampleFile,
-                options,
-                result -> Log.i("MyAmplifyApp", "Successfully uploaded: " + "ExampleKey"),
-                error -> Log.e("MyAmplifyApp", "Upload failed", error)
-        );
-    }
 }
