@@ -1,10 +1,10 @@
 {
-  "projectName": "COMP599_A1",
-  "version": "3.0",
-  "frontend": "android",
   "providers": [
     "awscloudformation"
   ],
+  "projectName": "COMP599_A1",
+  "version": "3.0",
+  "frontend": "android",
   "android": {
     "config": {
       "ResDir": "app/src/main/res"
