@@ -61,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.login); //initialize view
+        setContentView(R.layout.login); //initialize page view
 
         //initialize views for login
         isFirstTimeUser = findViewById(R.id.isFirstTimeUser);
