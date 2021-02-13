@@ -32,13 +32,16 @@ import com.amplifyframework.storage.StorageAccessLevel;
 import com.amplifyframework.storage.StorageItem;
 import com.amplifyframework.storage.options.StorageDownloadFileOptions;
 import com.amplifyframework.storage.options.StorageListOptions;
+import com.amplifyframework.storage.options.StorageRemoveOptions;
 import com.amplifyframework.storage.options.StorageUploadFileOptions;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ImageProcessor extends AppCompatActivity {
 
@@ -49,7 +52,7 @@ public class ImageProcessor extends AppCompatActivity {
     private ImageView fileView;
     private TextView filename;
     private Spinner savedFiles;
-    private static final ArrayList<FileType> files = new ArrayList<>(); //file list for dropdown
+    private final Map<String, StorageType> storedFiles = new HashMap<>();
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
@@ -66,19 +69,16 @@ public class ImageProcessor extends AppCompatActivity {
         filterBtn = findViewById(R.id.filterBtn);
         saveToCloudBtn = findViewById(R.id.saveToCloudBtn);
 
-        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn),false); //set filter and save buttons to disabled
+        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), false); //set filter and save buttons to disabled
 
         String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE}; //request permissions
         requestPermissions(permissions, READ_REQUEST_CODE);
-
-        initializeFiles();
-        loadSavedFiles(null); //load previously stored photos into the dropdown menu
 
 
         //onclick listener for load button. loads file into fileView
         loadBtn.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) { ;
+            public void onClick(View view) {
                 Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
                 startActivityForResult(intent, RESULT_LOAD_IMAGE);
             }
@@ -86,6 +86,7 @@ public class ImageProcessor extends AppCompatActivity {
 
         //onclick listener for save locally button. save the file locally to internal storage
         saveLocallyBtn.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.N)
             @Override
             public void onClick(View view) {
                 String name = filename.getText().toString();
@@ -93,7 +94,7 @@ public class ImageProcessor extends AppCompatActivity {
                 Canvas canvas = new Canvas(bitmap);
                 fileView.draw(canvas);
                 storeInternally(name, bitmap); //function call to store internally
-                loadSavedFiles(name); //update dropdown menu
+                updateStorage();
                 Toast.makeText(getApplicationContext(), "File saved locally!", Toast.LENGTH_LONG).show();
             }
         });
@@ -109,6 +110,7 @@ public class ImageProcessor extends AppCompatActivity {
 
         //onclick listener for save to cloud button. Will write the contents of the file to amazon s3 using amplify
         saveToCloudBtn.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.N)
             @Override
             public void onClick(View v) {
                 String name = filename.getText().toString();
@@ -116,50 +118,58 @@ public class ImageProcessor extends AppCompatActivity {
                 Canvas canvas = new Canvas(bitmap);
                 fileView.draw(canvas);
                 uploadFile(name, bitmap); //function call to store to the cloud
-                loadSavedFiles(name); //update dropdown menu
-                Toast.makeText(getApplicationContext(), "File saved to the Cloud!", Toast.LENGTH_LONG).show();
+                updateStorage();
             }
         });
 
         //onclick listener for dropdown menu of files. When one is clicked, load the file into the fileView
         savedFiles.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @RequiresApi(api = Build.VERSION_CODES.N)
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                FileType file = getFile((String) parent.getItemAtPosition(position));
-                if(file != null){
-                    switch (file.getStorageType()) {
-                        case LOCAL: //if the file is saved locally
-                            fileView.clearColorFilter();
-                            fileView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath()));
-                            ImageProcessor.this.filename.setText(file.getName());
-                            toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn),true);
-                            removeCloudFiles();
-                            break;
-                        case CLOUD:
-                            StorageDownloadFileOptions options = StorageDownloadFileOptions.builder()
-                                    .accessLevel(StorageAccessLevel.PRIVATE)
-                                    .targetIdentityId(Amplify.Auth.getCurrentUser().getUserId())
-                                    .build();
-                            Amplify.Storage.downloadFile(
-                                    file.getName(),
-                                    file,
-                                    options,
-                                    result -> {
-                                        fileView.clearColorFilter();
-                                        fileView.setImageBitmap(BitmapFactory.decodeFile(result.getFile().getName()));
-                                        ImageProcessor.this.filename.setText(result.getFile().getName());
-                                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn),true);
-                                    } ,
-                                    error -> Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show()
-                            );
-                    }
+                String filename = (String) parent.getItemAtPosition(position);
+                File file = new File(getFilesDir().getAbsolutePath() + "/" + filename);
+                switch (storedFiles.get(filename)) {
+                    case LOCAL: //if the file is saved locally
+                        fileView.clearColorFilter();
+                        fileView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath()));
+                        ImageProcessor.this.filename.setText(file.getName());
+                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), true);
+                        break;
+                    case CLOUD:
+                        StorageDownloadFileOptions options = StorageDownloadFileOptions.builder()
+                                .accessLevel(StorageAccessLevel.PRIVATE)
+                                .targetIdentityId(Amplify.Auth.getCurrentUser().getUserId())
+                                .build();
+                        Amplify.Storage.downloadFile(
+                                file.getName(),
+                                file,
+                                options,
+                                result -> {
+                                    fileView.clearColorFilter();
+                                    fileView.setImageBitmap(BitmapFactory.decodeFile(result.getFile().getName()));
+                                    ImageProcessor.this.filename.setText(result.getFile().getName());
+                                    toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), true);
+                                },
+                                error -> {
+                                    fileView.setImageBitmap(null);
+                                    ImageProcessor.this.filename.setText("");
+                                    toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), false);
+                                    Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
+                                    System.out.println(error.getMessage());
+                                }
+                        );
                 }
+                updateStorage();
             }
-
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+
+        initializeFiles();
+        loadSavedFiles(null); //load previously stored photos into the dropdown menu
+
     }
 
     //import files from external storage
@@ -174,16 +184,16 @@ public class ImageProcessor extends AppCompatActivity {
             String picturePath = cursor.getString(columnIndex);
             cursor.close();
             String name = picturePath.substring(picturePath.lastIndexOf('/') + 1);
-            if(fileExists(name)){ //to ensure unique filenames when loading from external storage
+            if (storedFiles.containsKey(name)) { //to ensure unique filenames when loading from external storage
                 filename.setText(name + "1");
-            }else{
+            } else {
                 filename.setText(name);
             }
             fileView.clearColorFilter();
             fileView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
-            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn),true);
+            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn), true);
         } else {
-            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn),false);
+            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn), false);
         }
     }
 
@@ -203,11 +213,9 @@ public class ImageProcessor extends AppCompatActivity {
 
     //load filenames into dropdown menu and optionally select an option
     private void loadSavedFiles(String selected) {
-        ArrayList<String> savedFilenames = new ArrayList<String>();
-        for (FileType file : files) {
-            savedFilenames.add(file.getName()); //get all the filenames
-        }
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, savedFilenames);
+        ArrayList<String> savedFileNames = new ArrayList<>();
+        savedFileNames.addAll(storedFiles.keySet());
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, savedFileNames);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         savedFiles.setAdapter(adapter); //update dropdown
         if (selected != null) {
@@ -217,7 +225,7 @@ public class ImageProcessor extends AppCompatActivity {
 
     //helper method to toggle button visibility
     private void toggleButtonVisibility(List<Button> buttons, boolean visibility) {
-        for (Button b: buttons) {
+        for (Button b : buttons) {
             b.setEnabled(visibility);
         }
     }
@@ -230,11 +238,8 @@ public class ImageProcessor extends AppCompatActivity {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
             outputStream.flush();
             outputStream.close();
-            if(fileExists(filename)){
-                getFile(filename).setStorageType(StorageType.LOCAL);
-            }else{
-                files.add(new FileType(getFilesDir().getAbsolutePath() + "/" + filename, StorageType.LOCAL));
-            }
+            storedFiles.put(filename, StorageType.LOCAL);
+            loadSavedFiles(filename);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -242,13 +247,7 @@ public class ImageProcessor extends AppCompatActivity {
 
     //save the file to s3 and add it to the list of files
     private void uploadFile(String filename, Bitmap bitmap) {
-        FileType file;
-        if(fileExists(filename)){
-            file = getFile(filename);
-            file.setStorageType(StorageType.CLOUD);
-        }else{
-            file = new FileType(filename, StorageType.CLOUD);
-        }
+        File file = new File(getFilesDir().getAbsolutePath() + "/" + filename);
         try {
             FileOutputStream outputStream = new FileOutputStream(file);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
@@ -267,56 +266,63 @@ public class ImageProcessor extends AppCompatActivity {
                 filename,
                 file,
                 options,
-                result -> Toast.makeText(getApplicationContext(), "File uploaded to Cloud!", Toast.LENGTH_LONG).show(),
-                error ->  Toast.makeText(getApplicationContext(), "Upload to cloud failed. Please try again", Toast.LENGTH_LONG).show()
+                result -> {
+                    Toast.makeText(getApplicationContext(), "File uploaded to Cloud!", Toast.LENGTH_LONG).show();
+                    storedFiles.put(filename, StorageType.CLOUD);
+                    loadSavedFiles(filename);
+                    file.delete();
+                },
+                error -> {Toast.makeText(getApplicationContext(), "Upload to cloud failed. Please try again", Toast.LENGTH_LONG).show(); file.delete();}
         );
+
     }
 
-    private FileType getFile(String filename){
-        for(FileType file: files){
-            if(file.getName().equals(filename)){
-                return file;
-            }
-        }
-        return null;
-    }
-
-    private boolean fileExists(String filename){
-        for(FileType file: files){
-            if(file.getName().equals(filename)){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void removeCloudFiles(){
-        for(FileType file: files){
-            if(file.getStorageType() == StorageType.CLOUD){
-                file.delete();
-            }
-        }
-    }
-
-    public void initializeFiles(){
+    public void initializeFiles() {
         StorageListOptions options = StorageListOptions.builder()
                 .accessLevel(StorageAccessLevel.PRIVATE)
                 .targetIdentityId(Amplify.Auth.getCurrentUser().getUserId())
                 .build();
 
         Amplify.Storage.list(
-                "/",
+                "private/ca-central-1:27173bb9-a838-418d-8524-e0fcb5857770/",
                 options,
                 result -> {
+                    System.out.println(result.toString());
                     for (StorageItem item : result.getItems()) {
-                        files.add(new FileType(item.getKey(), StorageType.CLOUD));
+                        storedFiles.put(item.getKey(), StorageType.CLOUD);
                     }
                 },
-                error -> Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show()
+                error -> {
+                    Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
+                    System.out.println("Error listing files from cloud: " + error.getMessage());
+                }
         );
 
-        for(File file : getFilesDir().listFiles()){
-            files.add(new FileType(file.getName(), StorageType.LOCAL));
+        for (File file : getFilesDir().listFiles()) {
+           storedFiles.put(file.getName(), StorageType.LOCAL);
         }
+
+        System.out.println(storedFiles.toString());
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public void updateStorage(){
+        storedFiles.forEach((key,value) -> {
+            if(value == StorageType.CLOUD){
+                new File(getFilesDir().getAbsolutePath() + '/' + key).delete();
+            }else{
+                StorageRemoveOptions options = StorageRemoveOptions.builder()
+                        .accessLevel(StorageAccessLevel.PRIVATE)
+                        .targetIdentityId(Amplify.Auth.getCurrentUser().getUserId())
+                        .build();
+
+                Amplify.Storage.remove(
+                        key,
+                        options,
+                        result -> System.out.println("Successfully removed file from cloud storage"),
+                        error -> System.out.println("Error removing file " + key + " from cloud storage: " + error.getMessage())
+                );
+            }
+        });
     }
 }

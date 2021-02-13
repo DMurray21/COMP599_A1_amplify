@@ -37,6 +37,8 @@ import com.amplifyframework.auth.result.AuthSignInResult;
 import com.amplifyframework.core.Amplify;
 import com.amplifyframework.core.Consumer;
 import com.amplifyframework.storage.StorageAccessLevel;
+import com.amplifyframework.storage.StorageItem;
+import com.amplifyframework.storage.options.StorageListOptions;
 import com.amplifyframework.storage.options.StorageUploadFileOptions;
 import com.amplifyframework.storage.s3.AWSS3StoragePlugin;
 
@@ -117,7 +119,6 @@ public class MainActivity extends AppCompatActivity {
                             runOnUiThread(() -> {
                                 Toast.makeText(getApplicationContext(), "Welcome back, " + username, Toast.LENGTH_LONG).show();
                                 onLoginSuccess(v);
-                                //uploadFile(); //TODO remove this call once function is moved
                             });
                             break;
                         case CONFIRM_SIGN_IN_WITH_NEW_PASSWORD: //successful login for new user
