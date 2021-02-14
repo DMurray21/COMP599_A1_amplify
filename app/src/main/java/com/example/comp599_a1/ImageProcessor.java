@@ -36,6 +36,7 @@ import com.amplifyframework.storage.options.StorageRemoveOptions;
 import com.amplifyframework.storage.options.StorageUploadFileOptions;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -139,17 +140,18 @@ public class ImageProcessor extends AppCompatActivity {
                     case CLOUD:
                         StorageDownloadFileOptions options = StorageDownloadFileOptions.builder()
                                 .accessLevel(StorageAccessLevel.PRIVATE)
-                                .targetIdentityId(Amplify.Auth.getCurrentUser().getUserId())
+                                .targetIdentityId("ca-central-1:b8edbaaa-a63e-43ec-8954-f953f511729a")
                                 .build();
                         Amplify.Storage.downloadFile(
                                 file.getName(),
                                 file,
                                 options,
                                 result -> {
-                                    fileView.clearColorFilter();
-                                    fileView.setImageBitmap(BitmapFactory.decodeFile(result.getFile().getName()));
-                                    ImageProcessor.this.filename.setText(result.getFile().getName());
-                                    toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), true);
+                                        fileView.clearColorFilter();
+                                        fileView.setImageBitmap(BitmapFactory.decodeFile(result.getFile().getAbsolutePath()));
+                                        ImageProcessor.this.filename.setText(result.getFile().getName());
+                                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), true);
+                                        Toast.makeText(getApplicationContext(), "File Downloaded", Toast.LENGTH_LONG).show();
                                 },
                                 error -> {
                                     fileView.setImageBitmap(null);
@@ -247,7 +249,7 @@ public class ImageProcessor extends AppCompatActivity {
 
     //save the file to s3 and add it to the list of files
     private void uploadFile(String filename, Bitmap bitmap) {
-        File file = new File(getFilesDir().getAbsolutePath() + "/" + filename);
+        File file = new File(getFilesDir().getAbsolutePath() + filename);
         try {
             FileOutputStream outputStream = new FileOutputStream(file);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
@@ -268,41 +270,39 @@ public class ImageProcessor extends AppCompatActivity {
                 options,
                 result -> {
                     Toast.makeText(getApplicationContext(), "File uploaded to Cloud!", Toast.LENGTH_LONG).show();
-                    storedFiles.put(filename, StorageType.CLOUD);
                     loadSavedFiles(filename);
                     file.delete();
                 },
                 error -> {Toast.makeText(getApplicationContext(), "Upload to cloud failed. Please try again", Toast.LENGTH_LONG).show(); file.delete();}
         );
+        storedFiles.put(filename, StorageType.CLOUD);
 
     }
 
     public void initializeFiles() {
         StorageListOptions options = StorageListOptions.builder()
                 .accessLevel(StorageAccessLevel.PRIVATE)
-                .targetIdentityId(Amplify.Auth.getCurrentUser().getUserId())
+                .targetIdentityId("ca-central-1:b8edbaaa-a63e-43ec-8954-f953f511729a")
                 .build();
 
-        Amplify.Storage.list(
-                "private/ca-central-1:27173bb9-a838-418d-8524-e0fcb5857770/",
+            Amplify.Storage.list(
+                    "",
                 options,
-                result -> {
-                    System.out.println(result.toString());
-                    for (StorageItem item : result.getItems()) {
-                        storedFiles.put(item.getKey(), StorageType.CLOUD);
+                    result -> {
+                        for (StorageItem item : result.getItems()) {
+                            storedFiles.put(item.getKey(), StorageType.CLOUD);
+                        }
+                    },
+                    error -> {
+                        Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
+                        System.out.println("Error listing files from cloud: " + error.getMessage());
                     }
-                },
-                error -> {
-                    Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
-                    System.out.println("Error listing files from cloud: " + error.getMessage());
-                }
-        );
+            );
 
         for (File file : getFilesDir().listFiles()) {
            storedFiles.put(file.getName(), StorageType.LOCAL);
         }
-
-        System.out.println(storedFiles.toString());
+        loadSavedFiles(null);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -313,12 +313,12 @@ public class ImageProcessor extends AppCompatActivity {
             }else{
                 StorageRemoveOptions options = StorageRemoveOptions.builder()
                         .accessLevel(StorageAccessLevel.PRIVATE)
-                        .targetIdentityId(Amplify.Auth.getCurrentUser().getUserId())
+                        .targetIdentityId("ca-central-1:b8edbaaa-a63e-43ec-8954-f953f511729a")
                         .build();
 
                 Amplify.Storage.remove(
                         key,
-                        options,
+                        //options,
                         result -> System.out.println("Successfully removed file from cloud storage"),
                         error -> System.out.println("Error removing file " + key + " from cloud storage: " + error.getMessage())
                 );
