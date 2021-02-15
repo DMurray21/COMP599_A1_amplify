@@ -87,6 +87,7 @@ public class ImageProcessor extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                intent.putExtra("fromSignOut", true); //bundle userID for private file access
                 startActivityForResult(intent, RESULT_LOAD_IMAGE);
             }
         });

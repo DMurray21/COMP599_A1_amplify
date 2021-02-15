@@ -60,7 +60,6 @@ public class MainActivity extends AppCompatActivity {
     private EditText emailInput;
     private Button loginBtn;
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -73,15 +72,17 @@ public class MainActivity extends AppCompatActivity {
         emailInput = findViewById(R.id.emailInput);
         loginBtn = findViewById(R.id.loginBtn);
 
-
-        try {
-            Amplify.addPlugin(new AWSCognitoAuthPlugin()); //initialize plugins
-            Amplify.addPlugin(new AWSS3StoragePlugin());
-            Amplify.configure(getApplicationContext()); //initialize amplify
-        } catch (AmplifyException e) {
-            e.printStackTrace();
-            Toast.makeText(this, "Our application has encountered an unexpected error. Please try again later", Toast.LENGTH_LONG).show();
-            loginBtn.setEnabled(false);
+        if(!getIntent().getBooleanExtra("fromSignOut", false)){ //access userId from bundle){
+            System.out.println("LOAD AMPLIFY");
+            try {
+                Amplify.addPlugin(new AWSCognitoAuthPlugin()); //initialize plugins
+                Amplify.addPlugin(new AWSS3StoragePlugin());
+                Amplify.configure(getApplicationContext()); //initialize amplify
+            } catch (AmplifyException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Our application has encountered an unexpected error. Please try again later", Toast.LENGTH_LONG).show();
+                loginBtn.setEnabled(false);
+            }
         }
 
         //toggle email input visibility
