@@ -45,10 +45,10 @@
         android:layout_alignParentStart="true"
         android:layout_alignParentLeft="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginStart="10dp"
-        android:layout_marginLeft="10dp"
-        android:layout_marginEnd="25dp"
-        android:layout_marginRight="25dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginLeft="5dp"
+        android:layout_marginEnd="15dp"
+        android:layout_marginRight="15dp"
         android:layout_marginBottom="10dp"
         android:layout_toStartOf="@+id/saveLocallyBtn"
         android:layout_toLeftOf="@+id/saveLocallyBtn"
@@ -102,6 +102,32 @@
         android:layout_marginEnd="18dp"
         android:spinnerMode="dropdown"
         android:layout_marginRight="18dp" />
+
+    <Button
+        android:id="@+id/signOutBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/savedFiles"
+        android:layout_marginStart="102dp"
+        android:layout_marginLeft="102dp"
+        android:layout_marginTop="51dp"
+        android:layout_toEndOf="@+id/deleteFileBtn"
+        android:layout_toRightOf="@+id/deleteFileBtn"
+        android:text="Sign out"
+        app:backgroundTint="#F44336" />
+
+    <Button
+        android:id="@+id/deleteFileBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/loadBtn"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentLeft="true"
+        android:layout_marginStart="48dp"
+        android:layout_marginLeft="48dp"
+        android:layout_marginTop="40dp"
+        android:text="delete"
+        app:backgroundTint="#E91E63" />
 
 
 </RelativeLayout>

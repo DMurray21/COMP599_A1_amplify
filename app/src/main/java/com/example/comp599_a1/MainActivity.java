@@ -33,6 +33,7 @@ import android.widget.Toast;
 import com.amplifyframework.AmplifyException;
 import com.amplifyframework.auth.AuthException;
 import com.amplifyframework.auth.cognito.AWSCognitoAuthPlugin;
+import com.amplifyframework.auth.cognito.AWSCognitoAuthSession;
 import com.amplifyframework.auth.result.AuthSignInResult;
 import com.amplifyframework.core.Amplify;
 import com.amplifyframework.core.Consumer;
@@ -78,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
             Amplify.addPlugin(new AWSS3StoragePlugin());
             Amplify.configure(getApplicationContext()); //initialize amplify
         } catch (AmplifyException e) {
+            e.printStackTrace();
             Toast.makeText(this, "Our application has encountered an unexpected error. Please try again later", Toast.LENGTH_LONG).show();
             loginBtn.setEnabled(false);
         }
@@ -116,10 +118,8 @@ public class MainActivity extends AppCompatActivity {
                 public void accept(@NonNull AuthSignInResult result) {
                     switch (result.getNextStep().getSignInStep()) {
                         case DONE: //successful login for returning user
-                            runOnUiThread(() -> {
-                                Toast.makeText(getApplicationContext(), "Welcome back, " + username, Toast.LENGTH_LONG).show();
-                                onLoginSuccess(v);
-                            });
+                            runOnUiThread(() -> Toast.makeText(getApplicationContext(), "Welcome back, " + username, Toast.LENGTH_LONG).show());
+                            onLoginSuccess(v);
                             break;
                         case CONFIRM_SIGN_IN_WITH_NEW_PASSWORD: //successful login for new user
                             if (email.isEmpty()) { //new users need to provide email to verify
@@ -130,11 +130,8 @@ public class MainActivity extends AppCompatActivity {
                                     public void accept(@NonNull AuthSignInResult result) {
                                         switch (result.getNextStep().getSignInStep()) {
                                             case DONE: //successful confirmation of email
-                                                runOnUiThread(() -> {
-                                                    Toast.makeText(getApplicationContext(), "Welcome, " + username, Toast.LENGTH_LONG).show();
-                                                    onLoginSuccess(v);
-                                                    //uploadFile(); //TODO remove this call once function is moved
-                                                });
+                                                runOnUiThread(() -> Toast.makeText(getApplicationContext(), "Welcome, " + username, Toast.LENGTH_LONG).show());
+                                                onLoginSuccess(v);
                                                 break;
                                             default:
                                                 runOnUiThread(() -> Toast.makeText(getApplicationContext(), "Unsupported sign-in confirmation: " + result.getNextStep().getSignInStep() + " Please try again later", Toast.LENGTH_LONG).show());
@@ -162,8 +159,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onLoginSuccess(View v) {
-        Intent intent = new Intent(v.getContext(), ImageProcessor.class);
-        startActivity(intent);
+        Amplify.Auth.fetchAuthSession(
+                result -> {
+                    AWSCognitoAuthSession cognitoAuthSession = (AWSCognitoAuthSession) result;
+                    switch(cognitoAuthSession.getIdentityId().getType()) {
+                        case SUCCESS:
+                            runOnUiThread(() -> {
+                                Intent intent = new Intent(v.getContext(), ImageProcessor.class);
+                                intent.putExtra("userId", cognitoAuthSession.getIdentityId().getValue()); //bundle userID for private file access
+                                startActivity(intent);
+                            });
+                            break;
+                        case FAILURE:
+                            runOnUiThread(() -> Toast.makeText(getApplicationContext(), "An exception occurred accessing credentials. Please try again later", Toast.LENGTH_LONG).show());
+                    }
+                },
+                error -> Log.e("AuthQuickStart", error.toString())
+        );
     }
 
 }

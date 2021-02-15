@@ -27,6 +27,7 @@ import android.widget.Toast;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.amplifyframework.auth.cognito.AWSCognitoAuthSession;
 import com.amplifyframework.core.Amplify;
 import com.amplifyframework.storage.StorageAccessLevel;
 import com.amplifyframework.storage.StorageItem;
@@ -49,11 +50,13 @@ public class ImageProcessor extends AppCompatActivity {
     // Image processing
     private static final int RESULT_LOAD_IMAGE = 0;
     private static final int READ_REQUEST_CODE = 1;
-    private Button loadBtn, saveLocallyBtn, filterBtn, saveToCloudBtn;
+    private Button loadBtn, saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn, signOutBtn;
     private ImageView fileView;
     private TextView filename;
     private Spinner savedFiles;
     private final Map<String, StorageType> storedFiles = new HashMap<>();
+    private String userId;
+
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
@@ -69,8 +72,11 @@ public class ImageProcessor extends AppCompatActivity {
         saveLocallyBtn = findViewById(R.id.saveLocallyBtn);
         filterBtn = findViewById(R.id.filterBtn);
         saveToCloudBtn = findViewById(R.id.saveToCloudBtn);
+        signOutBtn = findViewById(R.id.signOutBtn);
+        deleteFileBtn = findViewById(R.id.deleteFileBtn);
+        userId = getIntent().getStringExtra("userId"); //access userId from bundle
 
-        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), false); //set filter and save buttons to disabled
+        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), false); //set filter and save buttons to disabled
 
         String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE}; //request permissions
         requestPermissions(permissions, READ_REQUEST_CODE);
@@ -85,6 +91,41 @@ public class ImageProcessor extends AppCompatActivity {
             }
         });
 
+        //on click listener for delete widget. will delete the file locally or from the cloud and update the dropdown menu
+        deleteFileBtn.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.N)
+            @Override
+            public void onClick(View v) {
+                String fileToDelete = filename.getText().toString();
+                if(storedFiles.get(fileToDelete) == StorageType.CLOUD){ //file is stored on the cloud
+                    deleteFromCloud(fileToDelete); //delete file from cloud
+                }
+                storedFiles.remove(fileToDelete); //remove from list of known files
+                updateStorage(); //this will remove the file locally
+                fileView.setImageBitmap(null); //clear ui image
+                ImageProcessor.this.filename.setText(""); //clear ui filename
+                toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), false); //disable buttons
+                loadSavedFiles(null); //update dropdown menu
+            }
+        });
+
+        //on click listener for signout button. will sign out the user and return back to login page
+        signOutBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Amplify.Auth.signOut(
+                        () -> runOnUiThread(() -> {
+                            Intent intent = new Intent(v.getContext(), MainActivity.class); //return back to login page
+                            startActivity(intent);
+                        }),
+                        error -> runOnUiThread(() -> {
+                            Toast.makeText(getApplicationContext(), "Error signing out. Please try again", Toast.LENGTH_LONG).show();
+                        })
+                );
+            }
+        });
+
+
         //onclick listener for save locally button. save the file locally to internal storage
         saveLocallyBtn.setOnClickListener(new View.OnClickListener() {
             @RequiresApi(api = Build.VERSION_CODES.N)
@@ -95,8 +136,6 @@ public class ImageProcessor extends AppCompatActivity {
                 Canvas canvas = new Canvas(bitmap);
                 fileView.draw(canvas);
                 storeInternally(name, bitmap); //function call to store internally
-                updateStorage();
-                Toast.makeText(getApplicationContext(), "File saved locally!", Toast.LENGTH_LONG).show();
             }
         });
 
@@ -119,7 +158,6 @@ public class ImageProcessor extends AppCompatActivity {
                 Canvas canvas = new Canvas(bitmap);
                 fileView.draw(canvas);
                 uploadFile(name, bitmap); //function call to store to the cloud
-                updateStorage();
             }
         });
 
@@ -129,49 +167,53 @@ public class ImageProcessor extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String filename = (String) parent.getItemAtPosition(position);
-                File file = new File(getFilesDir().getAbsolutePath() + "/" + filename);
+                File file = new File(getFilesDir().getAbsolutePath() + "/" + filename); //get local file or create if it does not exist
                 switch (storedFiles.get(filename)) {
                     case LOCAL: //if the file is saved locally
-                        fileView.clearColorFilter();
-                        fileView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath()));
-                        ImageProcessor.this.filename.setText(file.getName());
-                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), true);
+                        fileView.clearColorFilter(); //clear the filter if it previously existed
+                        fileView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath())); //update ui image
+                        ImageProcessor.this.filename.setText(file.getName()); //update ui filename
+                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), true); //enable buttons
+                        updateStorage(); //ensure that no cloud files are stored locally
                         break;
-                    case CLOUD:
+                    case CLOUD: //the file is stored on the cloud
+
+                        //download config
                         StorageDownloadFileOptions options = StorageDownloadFileOptions.builder()
                                 .accessLevel(StorageAccessLevel.PRIVATE)
-                                .targetIdentityId("ca-central-1:b8edbaaa-a63e-43ec-8954-f953f511729a")
+                                .targetIdentityId(userId)
                                 .build();
+
                         Amplify.Storage.downloadFile(
                                 file.getName(),
                                 file,
                                 options,
-                                result -> {
-                                        fileView.clearColorFilter();
-                                        fileView.setImageBitmap(BitmapFactory.decodeFile(result.getFile().getAbsolutePath()));
-                                        ImageProcessor.this.filename.setText(result.getFile().getName());
-                                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), true);
-                                        Toast.makeText(getApplicationContext(), "File Downloaded", Toast.LENGTH_LONG).show();
+                                result -> { //download success. file is now downloaded locally for editing
+                                    runOnUiThread(() -> {
+                                        fileView.clearColorFilter(); //clear the filter if it previously existed
+                                        fileView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath())); //update ui image
+                                        ImageProcessor.this.filename.setText(file.getName()); //update ui filename
+                                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), true); //enable buttons
+                                        Toast.makeText(getApplicationContext(), "File downloaded from cloud", Toast.LENGTH_LONG).show();
+                                    });
                                 },
-                                error -> {
-                                    fileView.setImageBitmap(null);
-                                    ImageProcessor.this.filename.setText("");
-                                    toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn), false);
-                                    Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
-                                    System.out.println(error.getMessage());
+                                error -> { //download failed
+                                    runOnUiThread(() -> {
+                                        fileView.setImageBitmap(null); //clear ui image
+                                        ImageProcessor.this.filename.setText(""); //clear ui filename
+                                        toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), false); //disable buttons
+                                        Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
+                                    });
                                 }
                         );
                 }
-                updateStorage();
             }
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
 
-        initializeFiles();
-        loadSavedFiles(null); //load previously stored photos into the dropdown menu
-
+        initializeFiles(); //load dropdown menu
     }
 
     //import files from external storage
@@ -186,16 +228,16 @@ public class ImageProcessor extends AppCompatActivity {
             String picturePath = cursor.getString(columnIndex);
             cursor.close();
             String name = picturePath.substring(picturePath.lastIndexOf('/') + 1);
-            if (storedFiles.containsKey(name)) { //to ensure unique filenames when loading from external storage
-                filename.setText(name + "1");
+            if (storedFiles.containsKey(name)) { //to ensure unique filenames when loading from external storage. we will add a '1' to the filename
+                filename.setText("1" + name);
             } else {
                 filename.setText(name);
             }
-            fileView.clearColorFilter();
-            fileView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
-            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn), true);
+            fileView.clearColorFilter(); //ensure there is no filter
+            fileView.setImageBitmap(BitmapFactory.decodeFile(picturePath)); //set ui image
+            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn), true); //enable buttons
         } else {
-            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn), false);
+            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn), false);
         }
     }
 
@@ -233,6 +275,7 @@ public class ImageProcessor extends AppCompatActivity {
     }
 
     //save the file to local storage and add it to the list of files
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void storeInternally(String filename, Bitmap bitmap) {
         FileOutputStream outputStream = null;
         try {
@@ -241,88 +284,123 @@ public class ImageProcessor extends AppCompatActivity {
             outputStream.flush();
             outputStream.close();
             storedFiles.put(filename, StorageType.LOCAL);
-            loadSavedFiles(filename);
+            updateStorage(); //ensure it is not saved to the cloud
+            loadSavedFiles(filename); //update dropdown menu
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     //save the file to s3 and add it to the list of files
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void uploadFile(String filename, Bitmap bitmap) {
         File file = new File(getFilesDir().getAbsolutePath() + filename);
         try {
             FileOutputStream outputStream = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream); //write image to file
             outputStream.close();
             outputStream.flush();
         } catch (Exception exception) {
             Toast.makeText(getApplicationContext(), "An error occurred processing the file. Please try again", Toast.LENGTH_LONG).show();
         }
 
+        //upload config
         StorageUploadFileOptions options =
                 StorageUploadFileOptions.builder()
                         .accessLevel(StorageAccessLevel.PRIVATE)
                         .build();
 
+        //upload file to s3
         Amplify.Storage.uploadFile(
                 filename,
                 file,
                 options,
                 result -> {
-                    Toast.makeText(getApplicationContext(), "File uploaded to Cloud!", Toast.LENGTH_LONG).show();
-                    loadSavedFiles(filename);
-                    file.delete();
+                    runOnUiThread(() -> {
+                        Toast.makeText(getApplicationContext(), "File uploaded to Cloud!", Toast.LENGTH_LONG).show();
+                        storedFiles.put(filename, StorageType.CLOUD);
+                        updateStorage(); //ensure it is not saved locally
+                        loadSavedFiles(filename); //update dropdown menu
+                    });
                 },
-                error -> {Toast.makeText(getApplicationContext(), "Upload to cloud failed. Please try again", Toast.LENGTH_LONG).show(); file.delete();}
+                error -> {
+                    runOnUiThread(() -> {
+                        Toast.makeText(getApplicationContext(), "Upload to cloud failed. Please try again", Toast.LENGTH_LONG).show();
+                    });
+                }
         );
-        storedFiles.put(filename, StorageType.CLOUD);
-
     }
 
+    //list saved file names from internal and cloud storage
     public void initializeFiles() {
-        StorageListOptions options = StorageListOptions.builder()
-                .accessLevel(StorageAccessLevel.PRIVATE)
-                .targetIdentityId("ca-central-1:b8edbaaa-a63e-43ec-8954-f953f511729a")
-                .build();
-
-            Amplify.Storage.list(
-                    "",
-                options,
-                    result -> {
-                        for (StorageItem item : result.getItems()) {
-                            storedFiles.put(item.getKey(), StorageType.CLOUD);
-                        }
-                    },
-                    error -> {
-                        Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
-                        System.out.println("Error listing files from cloud: " + error.getMessage());
-                    }
-            );
 
         for (File file : getFilesDir().listFiles()) {
-           storedFiles.put(file.getName(), StorageType.LOCAL);
+            storedFiles.put(file.getName(), StorageType.LOCAL); //add local filenames
         }
-        loadSavedFiles(null);
+
+        //list config
+        StorageListOptions options = StorageListOptions.builder()
+                .accessLevel(StorageAccessLevel.PRIVATE)
+                .targetIdentityId(userId)
+                .build();
+
+        //list private files from s3
+        Amplify.Storage.list(
+                "",
+                options,
+                result -> {
+                    runOnUiThread(() -> {
+                        for (StorageItem item : result.getItems()) {
+                            storedFiles.put(item.getKey(), StorageType.CLOUD); //add cloud filenames
+                        }
+                        loadSavedFiles(null); //update dropdown menu once filenames are loaded
+                    });
+                },
+                error -> {
+                    runOnUiThread(() -> {
+                        loadSavedFiles(null); //can still load local filenames
+                        Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
+                    });
+                }
+        );
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public void updateStorage(){
-        storedFiles.forEach((key,value) -> {
-            if(value == StorageType.CLOUD){
-                new File(getFilesDir().getAbsolutePath() + '/' + key).delete();
-            }else{
-                StorageRemoveOptions options = StorageRemoveOptions.builder()
-                        .accessLevel(StorageAccessLevel.PRIVATE)
-                        .targetIdentityId("ca-central-1:b8edbaaa-a63e-43ec-8954-f953f511729a")
-                        .build();
 
-                Amplify.Storage.remove(
-                        key,
-                        //options,
-                        result -> System.out.println("Successfully removed file from cloud storage"),
-                        error -> System.out.println("Error removing file " + key + " from cloud storage: " + error.getMessage())
-                );
+    //ensures no duplicate files are stored. ie if file is saved on the cloud it is not saved locally. if the file is saved locally it is not saved on the cloud.
+    //if the file is not recognized as being saved on either, it is deleted from local storage
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public void updateStorage() {
+
+        storedFiles.forEach((key, value) -> {
+            if (value == StorageType.CLOUD) {
+                new File(getFilesDir().getAbsolutePath() + '/' + key).delete(); //delete local files if they are saved on the cloud
+            } else { //delete cloud files if they are saved locally
+                deleteFromCloud(key);
             }
         });
+
+        //delete unrecognized files
+        for (File file : getFilesDir().listFiles()){
+            if(!storedFiles.containsKey(file.getName())){
+                file.delete();
+            }
+        }
+    }
+
+
+    public void deleteFromCloud(String filename){
+        StorageRemoveOptions options = StorageRemoveOptions.builder()
+                .accessLevel(StorageAccessLevel.PRIVATE)
+                .targetIdentityId(userId)
+                .build();
+
+        Amplify.Storage.remove(
+                filename,
+                options,
+                result -> {},
+                error -> runOnUiThread(() -> {
+                    Toast.makeText(getApplicationContext(), "Error removing: " + filename + " from the cloud. Please try again", Toast.LENGTH_LONG).show();
+                })
+        );
     }
 }
