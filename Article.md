@@ -119,9 +119,38 @@ We will now dive into a brief analysis of the code and important functionality.
 
 ### Code Overview
 
+#### Asking for permission to read from the gallery
+
+Before attempting to load photos from the gallery, it is necessary to ask for the appropriate permission in the `AndroidManifest.xml`.
+
 `<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>`
 
-We state the permission we need to load images from the gallery here. 
+These permissions also need to be requested in the `ImageProcessor.java` class where the bulk of the calls to the Amplify API take place. Requesting this permissions lead to a popup appearing on the device prompting the user to allow or deny the requested permission. 
+
+```
+String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE}; //request permissions
+requestPermissions(permissions, READ_REQUEST_CODE);
+```
+Finally, we must display the appropriate message to the user when they accept or deny permissions requested by the Image Processor.
+
+```
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case READ_REQUEST_CODE:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(getApplicationContext(), "Permission granted", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(getApplicationContext(), "Read external storage permission not granted. You will not be able to load photos from the gallery", Toast.LENGTH_LONG).show();
+                }
+                break;
+        }
+    }
+```
+
+#### Configuring the application with the Amplify framwork
+
+The code is taken from the [docs](https://docs.amplify.aws/lib/project-setup/create-application/q/platform/android#n4-initialize-amplify-in-the-application). We add the authorization and storage plugins then call Amplify.configure on our application context, catching appropriate exceptions that may occur. We also add a flag to check if the user has just signed out from the application, in which case we do not need to reconfigure amplify. 
 
 ```  
  if(!getIntent().getBooleanExtra("fromSignOut", false)) {
@@ -142,8 +171,9 @@ We state the permission we need to load images from the gallery here.
             }
         }
 ```
+#### Authenticating with Amplify
 
-This block will configure our application with the Amplify framework. The code is taken from the [docs](https://docs.amplify.aws/lib/project-setup/create-application/q/platform/android#n4-initialize-amplify-in-the-application). We add the authorization and storage plugins then call Amplify.configure on our application context, catching appropriate exceptions that may occur. We also add a flag to check if the user has just signed out from the application, in which case we do not need to reconfigure amplify. 
+We first ensure that the username and password inputs are non-empty, then call `Amplify.Auth.signIn` to proceed with the authentication process. Amplify.Auth.signIn takes as input a username, password, as well as success and an error callbacks. If the authentication was successful we display a toast to the user, and proceed to the main page of the application. If the authentication was successful, but it is the user's first time entering the application, we first check that they provided the email verification input, then proceed by calling `Amplify.Auth.confirmSignIn()`. This method takes as input a confirmation code which we set to be the user email (this can easily be changed) as well as success and error callbacks. If the confirmation is successful, we display a toast to the new user, and proceed to the main page of the application. If at any point along the way authentication was not successful or an exception occurred, we display an appropriate toast to the user and prompt them to try again. Some possible improvements here would be to limit the number of incorrect attempts a user has to sign-in and to include [multi-factor authentication](https://docs.amplify.aws/lib/auth/signin/q/platform/android#multi-factor-authentication).
 
 ```
 private void authenticate(String username, String password, String email, View v) {
@@ -196,8 +226,7 @@ private void authenticate(String username, String password, String email, View v
     }
 ```
 
-
-This is the function we call to authenticate a user with Amplify. We first ensure that the username and password inputs are non-empty, then call Amplify.Auth.signIn to proceed with the authentication process. Amplify.Auth.signIn takes as input a username, password, a success callback and an error callback. If the authentication was successful we display a toast to the user, and proceed to the main page of the application. If the authentication was successful but it is the users first time entering the application we first check that they provided the email verification input, then proceed by calling Amplify.Auth.confirmSignIn. Amplify.Auth.confirmSignIn takes as input a confirmation code which we set to be the user email (this can easily be changed) as well as a success callback and an error callback. If the confirmation was successful we display a toast to the new user, and proceed to the main page of the application. If at any point along the way authentication was not successful or an exception occurred we display an appropriate toast to the user and prompt them to try again. Some possible improvements here would be to limit the number of incorrect attempts a user has to sign-in and to include [multi-factor authentication](https://docs.amplify.aws/lib/auth/signin/q/platform/android#multi-factor-authentication).
+After the user is successfully authenticated with Amplify, we call `Amplify.Auth.fetchSession()` to fetch the user identification needed for listing and downloading private files. We then proceed to the main page of the application passing along the fetched user ID. 
 
 ```
 private void onLoginSuccess(View v) {
@@ -220,31 +249,9 @@ private void onLoginSuccess(View v) {
         );
     }
 ```
-This block gets executed when a user has successfully authenticated themselves with Amplify. We call Amplify.Auth.fetchSession to fetch the user identification needed for listing and downloading private files. We then proceed to the main page of the application passing along the fetched user ID. 
+#### Loading Images from the Gallery
 
-```
-String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE}; //request permissions
-requestPermissions(permissions, READ_REQUEST_CODE);
-```
-
-We request the permission we need here. A popup will appear on the device prompting the user to allow or deny the requested permission. 
-
-```
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case READ_REQUEST_CODE:
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(getApplicationContext(), "Permission granted", Toast.LENGTH_LONG).show();
-                } else {
-                    Toast.makeText(getApplicationContext(), "Read external storage permission not granted. You will not be able to load photos from the gallery", Toast.LENGTH_LONG).show();
-                }
-                break;
-        }
-    }
-```
-
-This block will be executed when the user either allows or denies the requested permission. We display the appropriate message in both cases. 
+When the user clicks on the Load from Media button, we first check if the permission has been granted then proceed to let the user choose an image to load from the gallery.
 
 ```
         loadBtn.setOnClickListener(new View.OnClickListener() {
@@ -259,8 +266,7 @@ This block will be executed when the user either allows or denies the requested 
             }
         });
 ```
-
-This block will get executed when the user clicks on the Load from Media button. We first check if the permission has been granted then proceed to let the user choose an image to load from the gallery.
+After the user has selected an image from the gallery, we retrieve the image filename, and load the image into the application user interface. Note if the image filename already exists within the application, we append a “1” to the start to ensure unique filenames. 
 
 ```
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -276,49 +282,25 @@ This block will get executed when the user clicks on the Load from Media button.
     }
 ```
 
-This block will get executed once the user has selected an image from the gallery. We proceed to get the image filename, then load the image into the application user interface. Note if the image filename already exists within the application we append a “1” to the start to ensure unique filenames. 
+#### Configuring the Saved Files Dropdown Menu
+
+This function will load the saved filenames into the dropdown menu for the user to select. It will optionally set a selected value for the user, or by default set the selection to the first item in the list.
 
 ```
-        //on click listener for delete widget. will delete the file locally or from the cloud and update the dropdown menu
-        deleteFileBtn.setOnClickListener(new View.OnClickListener() {
-            @RequiresApi(api = Build.VERSION_CODES.N)
-            @Override
-            public void onClick(View v) {
-                String fileToDelete = filename.getText().toString();
-                if(storedFiles.get(fileToDelete) == StorageType.CLOUD){ //file is stored on the cloud
-                    deleteFromCloud(fileToDelete); //delete file from cloud
-                }
-                storedFiles.remove(fileToDelete); //remove from list of known files
-                updateStorage(); //this will remove the file locally
-                fileView.setImageBitmap(null); //clear ui image
-                ImageProcessor.this.filename.setText(""); //clear ui filename
-                toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), false); //disable buttons
-                loadSavedFiles(Optional.empty()); //update dropdown menu
-            }
-        });
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private void loadSavedFiles(Optional<String> selected) {
+        ArrayList<String> savedFileNames = new ArrayList<>();
+        savedFileNames.addAll(storedFiles.keySet());
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, savedFileNames);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        savedFiles.setAdapter(adapter); //update dropdown
+        if (selected.isPresent()) {
+            savedFiles.setSelection(adapter.getPosition(selected.get())); //set selected value if provided (default is the first value)
+        }
+    }
 ```
 
-This block will get executed when the user clicks the delete button. We delete the file locally or on the cloud depending on where it is stored, clear the image from the user interface, disable the buttons then update the dropdown menu of saved files.
-
-```
-        signOutBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Amplify.Auth.signOut(
-                        () -> runOnUiThread(() -> {
-                            Intent intent = new Intent(v.getContext(), MainActivity.class); //return back to login page
-                            intent.putExtra("fromSignOut", true); //to ensure amplify doesn't reload
-                            startActivity(intent);
-                        }),
-                        error -> runOnUiThread(() -> {
-                            Toast.makeText(getApplicationContext(), "Error signing out. Please try again", Toast.LENGTH_LONG).show();
-                        })
-                );
-            }
-        });
-```
-
-This block is executed when the user clicks the sign-out button. We call Amplify.Auth.signOut then if the sign-out was successful, return to the login page. Note we pass the boolean fromSignOut here so as not to reconfigure amplify on the login page. 
+When an image is selected in the dropdown menu, we first check if the image is saved locally, or on the cloud. If the file is saved locally, we call `fileView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath()));` to load the image into the UI. If it is saved on the cloud, we call `Amplify.Storage.downloadFile()` and pass in the filename, a file object to capture the downloaded image, `StorageDownloadFileOptions` needed to access private images, as well as success and error callbacks. 
 
 ```
         savedFiles.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -375,25 +357,48 @@ This block is executed when the user clicks the sign-out button. We call Amplify
     }
 ```
 
-This block gets executed when an option is selected in the dropdown menu. We first check if the file is saved locally, or on the cloud. If the file is saved locally we call `fileView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath()));`
-to load the image into the UI. If it is saved on the cloud we call Amplify.Storage.downloadFile and pass in the filename, a file object to download the image into, StorageDownloadFileOptions needed to access private files, as well as a success callback and an error callback. 
+`InitializedFiles()` will load the saved filenames into our collection then update the dropdown menu We call this once when the page is loaded. We list the files saved in internal storage by calling `getFilesDir().listFiles()` And the files saved on the cloud by calling `Amplify.Storage.list()` with the appropriate `StorageListOptions` to list private files.
 
 ```
+    //list saved file names from internal and cloud storage
     @RequiresApi(api = Build.VERSION_CODES.N)
-    private void loadSavedFiles(Optional<String> selected) {
-        ArrayList<String> savedFileNames = new ArrayList<>();
-        savedFileNames.addAll(storedFiles.keySet());
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, savedFileNames);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        savedFiles.setAdapter(adapter); //update dropdown
-        if (selected.isPresent()) {
-            savedFiles.setSelection(adapter.getPosition(selected.get())); //set selected value if provided (default is the first value)
+    public void initializeFiles() {
+
+        for (File file : getFilesDir().listFiles()) {
+            storedFiles.put(file.getName(), StorageType.LOCAL); //add local filenames
         }
+
+        //list config
+        StorageListOptions options = StorageListOptions.builder()
+                .accessLevel(StorageAccessLevel.PRIVATE)
+                .targetIdentityId(userId)
+                .build();
+
+        //list private files from s3
+        Amplify.Storage.list(
+                "",
+                options,
+                result -> {
+                    runOnUiThread(() -> {
+                        for (StorageItem item : result.getItems()) {
+                            storedFiles.put(item.getKey(), StorageType.CLOUD); //add cloud filenames
+                        }
+                        loadSavedFiles(Optional.empty()); //update dropdown menu once filenames are loaded
+                    });
+                },
+                error -> {
+                    runOnUiThread(() -> {
+                        loadSavedFiles(Optional.empty()); //can still load local filenames
+                        Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
+                    });
+                }
+        );
     }
 ```
 
-This function will load the saved filenames into the dropdown menu for the user to select.  
-It will optionally set a selected value for the user, or by default set the selection to the first item in the list. Note that by updating the dropdown menu, the onItemSelectedListener described above will be executed, which is why we include a parameter to set the selected value. 
+#### Saving Images to Local and Cloud Storage
+
+This function will save the image to local storage. We open the file location in internal storage using `openFileOutput(filename, MODE_PRIVATE)` then write the image to the file using `bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream`. We then add the filename to our collection of saved filenames and update the dropdown menu accordingly. 
 
 ```
     //save the file to local storage and add it to the list of files
@@ -413,10 +418,7 @@ It will optionally set a selected value for the user, or by default set the sele
         }
     }
 ```
-
-This function will save the image to local storage. We open the file location in internal storage using `openFileOutput(filename, MODE_PRIVATE)`
-then write the image to the file using `bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream`
-We then add the filename to our collection of saved filenames and update the dropdown menu accordingly. 
+This function will save the image to cloud storage. We first write the image to a local file analogous to the method described above. We then call `Amplify.Storage.uploadFile()` to upload the file to the cloud, passing in `StorageUploadFileOptions` to ensure the file is uploaded to a private location.
 
 ```
     //save the file to s3 and add it to the list of files
@@ -458,49 +460,9 @@ We then add the filename to our collection of saved filenames and update the dro
                 }
         );
     }
-```
+``` 
 
-This function will save the image to cloud storage. We first write the image to a local file analogous to the method described above. We then call Amplify.Storage.uploadFile to upload the file to the cloud, passing in StorageUploadFileOptions to ensure the file is uploaded to a private location. 
-
-```
-    //list saved file names from internal and cloud storage
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public void initializeFiles() {
-
-        for (File file : getFilesDir().listFiles()) {
-            storedFiles.put(file.getName(), StorageType.LOCAL); //add local filenames
-        }
-
-        //list config
-        StorageListOptions options = StorageListOptions.builder()
-                .accessLevel(StorageAccessLevel.PRIVATE)
-                .targetIdentityId(userId)
-                .build();
-
-        //list private files from s3
-        Amplify.Storage.list(
-                "",
-                options,
-                result -> {
-                    runOnUiThread(() -> {
-                        for (StorageItem item : result.getItems()) {
-                            storedFiles.put(item.getKey(), StorageType.CLOUD); //add cloud filenames
-                        }
-                        loadSavedFiles(Optional.empty()); //update dropdown menu once filenames are loaded
-                    });
-                },
-                error -> {
-                    runOnUiThread(() -> {
-                        loadSavedFiles(Optional.empty()); //can still load local filenames
-                        Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
-                    });
-                }
-        );
-    }
-```
-
-This function will load the saved filenames into our collection then update the dropdown menu We call this once when the page is loaded. We list the files saved in internal storage by calling `getFilesDir().listFiles()` And the files saved on the cloud by calling Amplify.Storage.list with the appropriate StorageListOptions to list private files.
-
+We also need to include a helper function to ensure users files are not saved in both local storage and on the cloud. We added this to keep consistent with the user requirement that files are saved only where expected. We loop through the saved files and check where the file is expected to be saved. If it is expected to be saved locally, we ensure it is deleted from the cloud. If it is expected to be saved to the cloud, we ensure it is deleted locally. We also ensure that any unrecognized files (that could be created as a result of a failed upload/download to and from the cloud service) are deleted from local storage. 
 
 ```
     //ensures no duplicate files are stored. ie if file is saved on the cloud it is not saved locally. if the file is saved locally it is not saved on the cloud.
@@ -525,7 +487,31 @@ This function will load the saved filenames into our collection then update the 
     }
 ```
 
-This function is a helper function to ensure users files are not saved in both local storage and on the cloud. We added this to keep consistent with the user requirement that files are saved only where expected. We loop through the saved files and check where the file is expected to be saved. If it is expected to be saved locally we ensure it is deleted from the cloud. If it is expected to be saved to the cloud we ensure it is deleted locally. We also ensure that any unrecognized files (that could be created as a result of a failed upload/download to and from the cloud service) are deleted from local storage. 
+#### Deleting a File from the App
+
+When the user clicks the delete button, the file is deleted locally or on the cloud depending on where it is stored. The image is then cleared from the user interface, the buttons are disabled, and the dropdown menu of saved files is updated.
+
+```
+        //on click listener for delete widget. will delete the file locally or from the cloud and update the dropdown menu
+        deleteFileBtn.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.N)
+            @Override
+            public void onClick(View v) {
+                String fileToDelete = filename.getText().toString();
+                if(storedFiles.get(fileToDelete) == StorageType.CLOUD){ //file is stored on the cloud
+                    deleteFromCloud(fileToDelete); //delete file from cloud
+                }
+                storedFiles.remove(fileToDelete); //remove from list of known files
+                updateStorage(); //this will remove the file locally
+                fileView.setImageBitmap(null); //clear ui image
+                ImageProcessor.this.filename.setText(""); //clear ui filename
+                toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), false); //disable buttons
+                loadSavedFiles(Optional.empty()); //update dropdown menu
+            }
+        });
+```
+
+This function removes the input filename from the cloud. We call `Amplify.Storage.remove()` with the appropriate `StorageRemoveOptions` to remove private files.
 
 ```
     public void deleteFromCloud(String filename){
@@ -543,11 +529,29 @@ This function is a helper function to ensure users files are not saved in both l
                 })
         );
     }
+``` 
+
+#### Signing out of the App
+
+When the user clicks the sign-out button, `Amplify.Auth.signOut()` is called. If the sign-out is successful, we return the user to the login page. Note we pass the boolean `fromSignOut` here so as not to reconfigure Amplify on the login page. 
+
 ```
-
-This function removes the input filename from the cloud. We call Amplify.Storage.remove with the appropriate StorageRemoveOptions to remove private files. 
-
-
+        signOutBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Amplify.Auth.signOut(
+                        () -> runOnUiThread(() -> {
+                            Intent intent = new Intent(v.getContext(), MainActivity.class); //return back to login page
+                            intent.putExtra("fromSignOut", true); //to ensure amplify doesn't reload
+                            startActivity(intent);
+                        }),
+                        error -> runOnUiThread(() -> {
+                            Toast.makeText(getApplicationContext(), "Error signing out. Please try again", Toast.LENGTH_LONG).show();
+                        })
+                );
+            }
+        });
+```
 
 ## Privacy Controls
 
