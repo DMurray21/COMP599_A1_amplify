@@ -22,7 +22,7 @@ Before diving into how the application will save to internal storage or to the c
 
 As an application developer you have the responsibility to meet the user’s expectations to balance functionality, privacy and security. You also have the responsibility to follow standards to mitigate the different risks the user is exposed to such as:
 
-- Insecurity: If insufficient security mechanisms are in place, photos may be stolen or disseminated without consent. Different authentication and access control measures must be in place to mitigate these risks. Mechanisms implemented by the image processor include authentication, access control, and encryption. They will be covered more in depth in the **(link)** section of the article.
+- Insecurity: If insufficient security mechanisms are in place, photos may be stolen or disseminated without consent. Different authentication and access control measures must be in place to mitigate these risks. Mechanisms implemented by the image processor include authentication, access control, and encryption. They will be covered more in depth [later](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/Article.md#privacy-controls) on in the article.
 - Exclusion: Users must be continually informed with changes to privacy policies and to the data collected by the application. They also must be able to access the photos stored on the application at all times.
 - Intrusion: The user’s images must not be accessed by unauthorized parties.
 - Distortion: The user’s images must not be modified without consent.
