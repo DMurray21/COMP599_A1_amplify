@@ -53,7 +53,7 @@ The primary downsides of using local storage are:
 
 As stated in the Android data and image storage overview document listed above there are four options to choose from when storing data, depending on the use case. We include an image of the section here for convenience.
 
-![Data and file storage overview](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/data_storage_overview.png)
+![Data and file storage overview](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/Images/data_storage_overview.png)
 
 We will look more into app-specific storage as it is relevant to our use case.
 
@@ -61,7 +61,7 @@ We will look more into app-specific storage as it is relevant to our use case.
 
 Within app-specific storage there are two subclasses, internal storage, and external storage. Descriptions of each are given from the android documentation below.
 
-![internal_storage_description](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/internal_storage_desc.png)
+![internal_storage_description](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/Images/internal_storage_desc.png)
 
 It is clear to see, when dealing with sensitive information it is best to use internal rather than external storage. If images are stored on external storage, they are still kept within the scope of the application, but other applications granted the MANAGE_EXTERNAL_STORAGE permission (such as the Android File (link to file app here) application) will still be able to read and write to them. It is important to notice this distinction when using app-specific storage. More on this can be found [here](https://www.journaldev.com/9383/android-internal-storage-example-tutorial) 
 
@@ -585,7 +585,7 @@ The two previous privacy controls we’ve implemented are tasked with ensuring a
 
 Enabling [data encryption with AWS S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html) isn’t a tall task as it can be set up with the click of a button. It suffices to look under the “Properties” section of your S3 bucket to enable server-side encryption when storing files to the bucket.
 
-![S3_bucket_encryption](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/Screen%20Shot%202021-02-18%20at%208.47.47%20PM.png)
+![S3_bucket_encryption](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/Images/Screen%20Shot%202021-02-18%20at%208.47.47%20PM.png)
 
 Amazon’s server-side encryption’s default behaviour is to encrypt files upon saving them to the bucket and decrypting them upon download. Although Amazon offers different options when it comes to [choosing the keys to encrypt the files](https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html), we have decided to use S3-Managed Keys for the context of the Image Processor. With S3-Managed Keys, each object saved to the bucket will be encrypted with a unique key. This prevents an attacker who has access to a key to have access to all files in the bucket. Furthermore, as an additional safeguard, each key is encrypted with a master key that is regularly rotated.
 
