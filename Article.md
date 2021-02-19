@@ -155,7 +155,7 @@ The two previous privacy controls we’ve implemented are tasked with ensuring a
 
 Enabling [data encryption with AWS S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html) isn’t a tall task as it can be set up with the click of a button. It suffices to look under the “Properties” section of your S3 bucket to enable server-side encryption when storing files to the bucket.
 
-[Screenshot]
+![S3_bucket_encryption](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/Screen%20Shot%202021-02-18%20at%208.47.47%20PM.png)
 
 Amazon’s server-side encryption’s default behaviour is to encrypt files upon saving them to the bucket and decrypting them upon download. Although Amazon offers different options when it comes to [choosing the keys to encrypt the files](https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html), we have decided to use S3-Managed Keys for the context of the Image Processor. With S3-Managed Keys, each object saved to the bucket will be encrypted with a unique key. This prevents an attacker who has access to a key to have access to all files in the bucket. Furthermore, as an additional safeguard, each key is encrypted with a master key that is regularly rotated.
 
