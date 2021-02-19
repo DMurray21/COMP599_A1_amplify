@@ -265,15 +265,27 @@ When the user clicks on the Load from Media button, we first check if the permis
 After the user has selected an image from the gallery, we retrieve the image filename, and load the image into the application user interface. Note if the image filename already exists within the application, we append a “1” to the start to ensure unique filenames. 
 
 ```
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    private void loadSavedFiles(Optional<String> selected) {
-        ArrayList<String> savedFileNames = new ArrayList<>();
-        savedFileNames.addAll(storedFiles.keySet());
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, savedFileNames);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        savedFiles.setAdapter(adapter); //update dropdown
-        if (selected.isPresent()) {
-            savedFiles.setSelection(adapter.getPosition(selected.get())); //set selected value if provided (default is the first value)
+    @SuppressLint("MissingSuperCall")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null != data) {
+            Uri selectedImage = data.getData();
+            String[] filePathColumn = {MediaStore.Images.Media.DATA};
+            Cursor cursor = getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+            cursor.moveToFirst();
+            int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+            String picturePath = cursor.getString(columnIndex);
+            cursor.close();
+            String name = picturePath.substring(picturePath.lastIndexOf('/') + 1);
+            if (storedFiles.containsKey(name)) { //to ensure unique filenames when loading from external storage. we will add a '1' to the filename
+                filename.setText("1" + name);
+            } else {
+                filename.setText(name);
+            }
+            fileView.clearColorFilter(); //ensure there is no filter
+            fileView.setImageBitmap(BitmapFactory.decodeFile(picturePath)); //set ui image
+            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn), true); //enable buttons
+        } else {
+            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn), false); //disable buttons
         }
     }
 ```
