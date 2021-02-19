@@ -575,7 +575,7 @@ Each of these controls will be covered in depth in the following three sections.
 
 One of the main advantages of working within the Amazon Web Services ecosystem is the ease with which we can integrate other services offered by AWS. Specifically, we used Amazon Cognito to create users and provide them credentials to access the application.
 
-To initialize users of the application, an Amazon Cognito user is created and added to an Identity and Access Management (IAM) user group with appropriate permissions. In our case, they are given access to a private S3 bucket where images from all users are stored. These permissions are read and write access to their files in the storage bucket. This means that an authenticated user will only be able to download, upload, and remove their own files from the bucket. The term “private bucket” may be confusing at the moment, but the different file access levels will be defined in the following section.
+To initialize users of the application, an Amazon Cognito user is created and added to an Identity and Access Management (IAM) user group with appropriate permissions. In our case, they are given access to a private S3 bucket where images from all users are stored. The term “private bucket” may be confusing at the moment, but the different file access levels will be defined in the following section.
 
 Setting up authentication for an image processing application may seem like overkill, but it truly is an essential step in ensuring that unauthorized access to the users’ data is limited.
 
