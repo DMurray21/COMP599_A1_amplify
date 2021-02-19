@@ -85,9 +85,7 @@ A good practice and something to consider when storing data through a cloud serv
 
 ### App Demo
 
-Here is a working demonstration of our application.
-
-![app_demo](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/2021-02-18%2013-34-07.mkv)
+Here is a [working demonstration](https://drive.google.com/file/d/1yPD1226fkZpIvA8CjoGJoAxyJ4rReKVT/view?usp=sharing) of our application.
 
 **Notes on demo and relevant documentation**
 
@@ -111,9 +109,7 @@ A benefit about using cloud services, as mentioned before, is that they typicall
 - Access control features and permissions can be set on the bucket.
 - The administrator has the option to allow users to sign themselves up for the service through the application or to only allow administrators to create users. This can be a helpful feature if the application is to be distributed to a set of known users.
 
-![creating_a_user](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/2021-02-18%2019-48-17.mkv)
-
-The user will then get an email with their credentials which they can use to sign into the app.
+The user will then get an email with their credentials which they can use to sign into the app. Watch [this](https://drive.google.com/file/d/1xh4gfqwQItIlpALbP3ARZfSUCbMhjK20/view?usp=sharing) to visualize the user creation process.
 
 We will now dive into a brief analysis of the code and important functionality.
 
