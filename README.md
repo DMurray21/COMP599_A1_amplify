@@ -6,9 +6,11 @@ The focus of this article will revolve around two ways for an application to sto
 
 The image processor application has fairly basic functionality. It ensures the user is authenticated before being given access to the application. It allows users to load images from their camera roll, apply a filter on the image, and save it to local storage or to an external cloud service. A user can also view all the different photos they have saved and have the option to delete them.
 
+
 ## User Requirements for Data Collection and Storage
 
 Before diving into how the application will save to internal storage or to the cloud, it is an important exercise to understand the different expectations a user may have when you collect and store their data, as well as the relevant risks and harms.
+
 
 ### What behaviour would a user expect from the application?
 
@@ -17,6 +19,7 @@ Before diving into how the application will save to internal storage or to the c
 - Security mechanisms should be in place to protect the user’s images from unauthorized access from other users or attackers.
 - Data quality shouldn’t be affected by storing the data. In our case, the images stored by the user shouldn’t be distorted when they are saved or retrieved from internal or cloud storage.
 - Implementing different security and privacy measures should not hinder the user’s experience. The user should be able to navigate the application without feeling hindered by the different measures put in place by the developer to maintain privacy and security standards.
+
 
 ### Privacy Risks and Harmful Data Actions to be Mitigated
 
@@ -33,9 +36,11 @@ Failing to mitigate these different risks leaves the user open to adverse experi
 - The user may lose trust in the application.
 - The user may be embarrassed by the photos exposed by a data breach and have their personal lives stigmatized.
 
+
 ## Storage Options 
 
 Before continuing to the code demo, it is important to note the advantages and in turn, disadvantages of storing images locally versus through a cloud service. The following section will highlight some of the relevant points.
+
 
 ### Local storage
 
@@ -57,6 +62,7 @@ As stated in the Android data and image storage overview document listed above t
 
 We will look more into app-specific storage as it is relevant to our use case.
 
+
 ### Internal vs External Storage
 
 Within app-specific storage there are two subclasses, internal storage, and external storage. Descriptions of each are given from the android documentation below.
@@ -64,6 +70,7 @@ Within app-specific storage there are two subclasses, internal storage, and exte
 ![internal_storage_description](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/Images/internal_storage_desc.png)
 
 It is clear to see, when dealing with sensitive information it is best to use internal rather than external storage. If images are stored on external storage, they are still kept within the scope of the application, but other applications granted the MANAGE_EXTERNAL_STORAGE permission (such as the Android File (link to file app here) application) will still be able to read and write to them. It is important to notice this distinction when using app-specific storage. More on this can be found [here](https://www.journaldev.com/9383/android-internal-storage-example-tutorial) 
+
 
 ### Cloud Storage
 
@@ -82,6 +89,7 @@ The primary downsides of using cloud storage are:
 - Slower retrieval and access to data. However, as edge computing becomes more prevalent this is becoming less of a downside. 
 
 A good practice and something to consider when storing data through a cloud service is to implement security and privacy controls locally on top of the security and privacy controls provided by the cloud service.
+
 
 ### App Demo
 
@@ -112,6 +120,7 @@ A benefit about using cloud services, as mentioned before, is that they typicall
 The user will then get an email with their credentials which they can use to sign into the app. Watch [this](https://drive.google.com/file/d/1xh4gfqwQItIlpALbP3ARZfSUCbMhjK20/view?usp=sharing) to visualize the user creation process.
 
 We will now dive into a brief analysis of the code and important functionality.
+
 
 ### Code Overview
 
@@ -144,6 +153,7 @@ Finally, we must display the appropriate message to the user when they accept or
     }
 ```
 
+
 #### Configuring the application with the Amplify framwork
 
 The code is taken from the [docs](https://docs.amplify.aws/lib/project-setup/create-application/q/platform/android#n4-initialize-amplify-in-the-application). We add the authorization and storage plugins then call Amplify.configure on our application context, catching appropriate exceptions that may occur. We also add a flag to check if the user has just signed out from the application, in which case we do not need to reconfigure amplify. 
@@ -167,6 +177,8 @@ The code is taken from the [docs](https://docs.amplify.aws/lib/project-setup/cre
             }
         }
 ```
+
+
 #### Authenticating with Amplify
 
 We first ensure that the username and password inputs are non-empty, then call `Amplify.Auth.signIn` to proceed with the authentication process. Amplify.Auth.signIn takes as input a username, password, as well as success and an error callbacks. If the authentication was successful we display a toast to the user, and proceed to the main page of the application. If the authentication was successful, but it is the user's first time entering the application, we first check that they provided the email verification input, then proceed by calling `Amplify.Auth.confirmSignIn()`. This method takes as input a confirmation code which we set to be the user email (this can easily be changed) as well as success and error callbacks. If the confirmation is successful, we display a toast to the new user, and proceed to the main page of the application. If at any point along the way authentication was not successful or an exception occurred, we display an appropriate toast to the user and prompt them to try again. Some possible improvements here would be to limit the number of incorrect attempts a user has to sign-in and to include [multi-factor authentication](https://docs.amplify.aws/lib/auth/signin/q/platform/android#multi-factor-authentication).
@@ -245,6 +257,8 @@ private void onLoginSuccess(View v) {
         );
     }
 ```
+
+
 #### Loading Images from the Gallery
 
 When the user clicks on the Load from Media button, we first check if the permission has been granted then proceed to let the user choose an image to load from the gallery.
@@ -277,6 +291,7 @@ After the user has selected an image from the gallery, we retrieve the image fil
         }
     }
 ```
+
 
 #### Configuring the Saved Files Dropdown Menu
 
@@ -392,6 +407,7 @@ When an image is selected in the dropdown menu, we first check if the image is s
     }
 ```
 
+
 #### Saving Images to Local and Cloud Storage
 
 This function will save the image to local storage. We open the file location in internal storage using `openFileOutput(filename, MODE_PRIVATE)` then write the image to the file using `bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream`. We then add the filename to our collection of saved filenames and update the dropdown menu accordingly. 
@@ -483,6 +499,7 @@ We also need to include a helper function to ensure users files are not saved in
     }
 ```
 
+
 #### Deleting a File from the App
 
 When the user clicks the delete button, the file is deleted locally or on the cloud depending on where it is stored. The image is then cleared from the user interface, the buttons are disabled, and the dropdown menu of saved files is updated.
@@ -527,6 +544,7 @@ This function removes the input filename from the cloud. We call `Amplify.Storag
     }
 ``` 
 
+
 #### Signing out of the App
 
 When the user clicks the sign-out button, `Amplify.Auth.signOut()` is called. If the sign-out is successful, we return the user to the login page. Note we pass the boolean `fromSignOut` here so as not to reconfigure Amplify on the login page. 
@@ -549,6 +567,7 @@ When the user clicks the sign-out button, `Amplify.Auth.signOut()` is called. If
         });
 ```
 
+
 ## Privacy Controls
 
 As previously mentioned, we have implemented three privacy controls to help mitigate the different privacy risks and data harms.
@@ -559,6 +578,7 @@ As previously mentioned, we have implemented three privacy controls to help miti
 
 Each of these controls will be covered in depth in the following three sections.
 
+
 ### Authentication
 
 One of the main advantages of working within the Amazon Web Services ecosystem is the ease with which we can integrate other services offered by AWS. Specifically, we used Amazon Cognito to create users and provide them credentials to access the application.
@@ -566,6 +586,7 @@ One of the main advantages of working within the Amazon Web Services ecosystem i
 To initialize users of the application, an Amazon Cognito user is created and added to an Identity and Access Management (IAM) user group with appropriate permissions. In our case, they are given access to a private S3 bucket where images from all users are stored. These permissions include read and write access to the storage bucket, meaning that an authenticated user will be able to download, upload, and remove their files from the bucket. The term “private bucket” may be confusing at the moment, but the different file access levels will be defined in the following section.
 
 Setting up authentication for an image processing application may seem like overkill, but it truly is an essential step in ensuring that unauthorized access to the users’ data is limited.
+
 
 ### Authorization
 
@@ -579,6 +600,7 @@ When configuring storage capabilities with the Amplify plugin, Amazon gives us t
 
 By ensuring that users are given the appropriate access levels, we’ve taken another important step in ensuring that data is protected from unauthorized access.
 
+
 ### Data Encryption 
 
 The two previous privacy controls we’ve implemented are tasked with ensuring authorized access to the images stored through the application. Data encryption is aimed at making sure that in the case where attackers gain access to the storage bucket, they won’t be able to make use of their findings.
@@ -590,6 +612,7 @@ Enabling [data encryption with AWS S3](https://docs.aws.amazon.com/AmazonS3/late
 Amazon’s server-side encryption’s default behaviour is to encrypt files upon saving them to the bucket and decrypting them upon download. Although Amazon offers different options when it comes to [choosing the keys to encrypt the files](https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html), we have decided to use S3-Managed Keys for the context of the Image Processor. With S3-Managed Keys, each object saved to the bucket will be encrypted with a unique key. This prevents an attacker who has access to a key to have access to all files in the bucket. Furthermore, as an additional safeguard, each key is encrypted with a master key that is regularly rotated.
 
 It is also important to note that encrypting files has no effect on user experience. As long as a user is authenticated and is performing an authorized action, reading and modifying their images will be a seamless process.
+
 
 ## Conclusion
 
