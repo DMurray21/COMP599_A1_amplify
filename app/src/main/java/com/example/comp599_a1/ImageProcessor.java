@@ -44,10 +44,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class ImageProcessor extends AppCompatActivity {
 
-    // Image processing
     private static final int RESULT_LOAD_IMAGE = 0;
     private static final int READ_REQUEST_CODE = 1;
     private Button loadBtn, saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn, signOutBtn;
@@ -74,7 +74,7 @@ public class ImageProcessor extends AppCompatActivity {
         saveToCloudBtn = findViewById(R.id.saveToCloudBtn);
         signOutBtn = findViewById(R.id.signOutBtn);
         deleteFileBtn = findViewById(R.id.deleteFileBtn);
-        userId = getIntent().getStringExtra("userId"); //access userId from bundle
+        userId = getIntent().getStringExtra("userId"); //access userId passed from login page (MainActivity)
 
         toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), false); //set filter and save buttons to disabled
 
@@ -82,13 +82,15 @@ public class ImageProcessor extends AppCompatActivity {
         requestPermissions(permissions, READ_REQUEST_CODE);
 
 
-        //onclick listener for load button. loads file into fileView
         loadBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-                intent.putExtra("fromSignOut", true); //bundle userID for private file access
-                startActivityForResult(intent, RESULT_LOAD_IMAGE);
+                if(checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED){ //check if permission was granted
+                    Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                    startActivityForResult(intent, RESULT_LOAD_IMAGE);
+                }else{
+                    Toast.makeText(getApplicationContext(), "Permission has not been granted", Toast.LENGTH_LONG).show();
+                }
             }
         });
 
@@ -106,17 +108,18 @@ public class ImageProcessor extends AppCompatActivity {
                 fileView.setImageBitmap(null); //clear ui image
                 ImageProcessor.this.filename.setText(""); //clear ui filename
                 toggleButtonVisibility(Arrays.asList(filterBtn, saveLocallyBtn, saveToCloudBtn, deleteFileBtn), false); //disable buttons
-                loadSavedFiles(null); //update dropdown menu
+                loadSavedFiles(Optional.empty()); //update dropdown menu
             }
         });
 
-        //on click listener for signout button. will sign out the user and return back to login page
+        //on click listener for sign-out button. will sign out the user and return back to login page
         signOutBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Amplify.Auth.signOut(
                         () -> runOnUiThread(() -> {
                             Intent intent = new Intent(v.getContext(), MainActivity.class); //return back to login page
+                            intent.putExtra("fromSignOut", true); //to ensure amplify doesn't reload
                             startActivity(intent);
                         }),
                         error -> runOnUiThread(() -> {
@@ -125,7 +128,6 @@ public class ImageProcessor extends AppCompatActivity {
                 );
             }
         });
-
 
         //onclick listener for save locally button. save the file locally to internal storage
         saveLocallyBtn.setOnClickListener(new View.OnClickListener() {
@@ -141,7 +143,6 @@ public class ImageProcessor extends AppCompatActivity {
         });
 
         //onclick listener for apply filter button. simply adds a red tint over the file
-        //this can easily be modified to support other types of file operations outside of the use case
         filterBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -162,7 +163,6 @@ public class ImageProcessor extends AppCompatActivity {
             }
         });
 
-        //onclick listener for dropdown menu of files. When one is clicked, load the file into the fileView
         savedFiles.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @RequiresApi(api = Build.VERSION_CODES.N)
             @Override
@@ -178,11 +178,10 @@ public class ImageProcessor extends AppCompatActivity {
                         updateStorage(); //ensure that no cloud files are stored locally
                         break;
                     case CLOUD: //the file is stored on the cloud
-
                         //download config
                         StorageDownloadFileOptions options = StorageDownloadFileOptions.builder()
                                 .accessLevel(StorageAccessLevel.PRIVATE)
-                                .targetIdentityId(userId)
+                                .targetIdentityId(userId) //pass user id
                                 .build();
 
                         Amplify.Storage.downloadFile(
@@ -217,7 +216,7 @@ public class ImageProcessor extends AppCompatActivity {
         initializeFiles(); //load dropdown menu
     }
 
-    //import files from external storage
+
     @SuppressLint("MissingSuperCall")
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null != data) {
@@ -238,33 +237,32 @@ public class ImageProcessor extends AppCompatActivity {
             fileView.setImageBitmap(BitmapFactory.decodeFile(picturePath)); //set ui image
             toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn), true); //enable buttons
         } else {
-            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn), false);
+            toggleButtonVisibility(Arrays.asList(saveLocallyBtn, filterBtn, saveToCloudBtn, deleteFileBtn), false); //disable buttons
         }
     }
-
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
             case READ_REQUEST_CODE:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    //Granted.
+                    Toast.makeText(getApplicationContext(), "Permission granted", Toast.LENGTH_LONG).show();
                 } else {
-                    //Denied.
+                    Toast.makeText(getApplicationContext(), "Read external storage permission not granted. You will not be able to load photos from the gallery", Toast.LENGTH_LONG).show();
                 }
                 break;
         }
     }
 
-    //load filenames into dropdown menu and optionally select an option
-    private void loadSavedFiles(String selected) {
+
+    private void loadSavedFiles(Optional<String> selected) {
         ArrayList<String> savedFileNames = new ArrayList<>();
         savedFileNames.addAll(storedFiles.keySet());
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, savedFileNames);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         savedFiles.setAdapter(adapter); //update dropdown
-        if (selected != null) {
-            savedFiles.setSelection(adapter.getPosition(selected)); //set selected value if provided (default is the first value)
+        if (selected.isPresent()) {
+            savedFiles.setSelection(adapter.getPosition(selected.get())); //set selected value if provided (default is the first value)
         }
     }
 
@@ -286,7 +284,7 @@ public class ImageProcessor extends AppCompatActivity {
             outputStream.close();
             storedFiles.put(filename, StorageType.LOCAL);
             updateStorage(); //ensure it is not saved to the cloud
-            loadSavedFiles(filename); //update dropdown menu
+            loadSavedFiles(Optional.of(filename)); //update dropdown menu
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -321,7 +319,7 @@ public class ImageProcessor extends AppCompatActivity {
                         Toast.makeText(getApplicationContext(), "File uploaded to Cloud!", Toast.LENGTH_LONG).show();
                         storedFiles.put(filename, StorageType.CLOUD);
                         updateStorage(); //ensure it is not saved locally
-                        loadSavedFiles(filename); //update dropdown menu
+                        loadSavedFiles(Optional.of(filename)); //update dropdown menu
                     });
                 },
                 error -> {
@@ -354,18 +352,17 @@ public class ImageProcessor extends AppCompatActivity {
                         for (StorageItem item : result.getItems()) {
                             storedFiles.put(item.getKey(), StorageType.CLOUD); //add cloud filenames
                         }
-                        loadSavedFiles(null); //update dropdown menu once filenames are loaded
+                        loadSavedFiles(Optional.empty()); //update dropdown menu once filenames are loaded
                     });
                 },
                 error -> {
                     runOnUiThread(() -> {
-                        loadSavedFiles(null); //can still load local filenames
+                        loadSavedFiles(Optional.empty()); //can still load local filenames
                         Toast.makeText(getApplicationContext(), "Unable to load cloud files. Please try again", Toast.LENGTH_LONG).show();
                     });
                 }
         );
     }
-
 
     //ensures no duplicate files are stored. ie if file is saved on the cloud it is not saved locally. if the file is saved locally it is not saved on the cloud.
     //if the file is not recognized as being saved on either, it is deleted from local storage
@@ -387,7 +384,6 @@ public class ImageProcessor extends AppCompatActivity {
             }
         }
     }
-
 
     public void deleteFromCloud(String filename){
         StorageRemoveOptions options = StorageRemoveOptions.builder()
