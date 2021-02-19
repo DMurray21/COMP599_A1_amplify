@@ -53,7 +53,7 @@ The primary downsides of using local storage are:
 
 As stated in the Android data and image storage overview document listed above there are four options to choose from when storing data, depending on the use case. We include an image of the section here for convenience.
 
-![Data and file storage overview]
+![Data and file storage overview](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/data_storage_overview.png)
 
 We will look more into app-specific storage as it is relevant to our use case.
 
@@ -61,7 +61,7 @@ We will look more into app-specific storage as it is relevant to our use case.
 
 Within app-specific storage there are two subclasses, internal storage, and external storage. Descriptions of each are given from the android documentation below.
 
-[screenshot]
+![internal_storage_description](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/internal_storage_desc.png)
 
 It is clear to see, when dealing with sensitive information it is best to use internal rather than external storage. If images are stored on external storage, they are still kept within the scope of the application, but other applications granted the MANAGE_EXTERNAL_STORAGE permission (such as the Android File (link to file app here) application) will still be able to read and write to them. It is important to notice this distinction when using app-specific storage. More on this can be found [here](https://www.journaldev.com/9383/android-internal-storage-example-tutorial) 
 
@@ -87,7 +87,7 @@ A good practice and something to consider when storing data through a cloud serv
 
 Here is a working demonstration of our application.
 
-[video]
+![app_demo](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/2021-02-18%2013-34-07.mkv)
 
 **Notes on demo and relevant documentation**
 
@@ -111,7 +111,7 @@ A benefit about using cloud services, as mentioned before, is that they typicall
 - Access control features and permissions can be set on the bucket.
 - The administrator has the option to allow users to sign themselves up for the service through the application or to only allow administrators to create users. This can be a helpful feature if the application is to be distributed to a set of known users.
 
-[video]
+![creating_a_user](https://github.com/DMurray21/COMP599_A1_amplify/blob/main/2021-02-18%2019-48-17.mkv)
 
 The user will then get an email with their credentials which they can use to sign into the app.
 
