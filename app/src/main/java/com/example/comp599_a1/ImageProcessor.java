@@ -255,6 +255,7 @@ public class ImageProcessor extends AppCompatActivity {
     }
 
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void loadSavedFiles(Optional<String> selected) {
         ArrayList<String> savedFileNames = new ArrayList<>();
         savedFileNames.addAll(storedFiles.keySet());
@@ -331,6 +332,7 @@ public class ImageProcessor extends AppCompatActivity {
     }
 
     //list saved file names from internal and cloud storage
+    @RequiresApi(api = Build.VERSION_CODES.N)
     public void initializeFiles() {
 
         for (File file : getFilesDir().listFiles()) {
